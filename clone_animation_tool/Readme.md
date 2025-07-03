@@ -1,4 +1,4 @@
-<p><img src="docs/clone_animation_tool.png"></p>
+<p><img src="../docs/clone_animation_tool.png"></p>
 This is the Animation Clone tool that I created for my small 2D platformer project.
 
 I developed this tool because I realized that a lot of the animations for the enemies, the weapons, etc... were basically just Sprite swaps, keeping the same Animator states and everything.
