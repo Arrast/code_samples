@@ -17,7 +17,7 @@ Each directory in this repository represents a standalone code sample or small t
 
 ## 🛠️ Technologies & Tools
 * Languages: `C#`
-* Frameworks/Libraries: `Unity`
+* Frameworks/Tools: `Unity`
 
 ## 📬 Contact Information
 * Email: [vmanuel.egea@gmail.com](mailto:vmanuel.egea@gmail.com)
