@@ -7,14 +7,38 @@ using UnityEngine;
 public static class CloneAnimationLogic
 {
     #region Variables
-    
+
     // Constants.
-    private const string BaseSpriteSheetsPath = "Assets/Art/Sprites/";
-    private const string BaseAnimationsPath = "Assets/Art/Animations/";
+    private const string BaseSpriteSheetsPath = "Assets/Art/Sprites";
+    private const string BaseAnimationsPath = "Assets/Art/Animations";
 
     #endregion
 
     #region Methods
+
+    public static void BuildAnimator(AnimatorController animatorController, Texture2D spriteSheet)
+    {
+        string animatorName = spriteSheet.name;
+        Dictionary<string, AnimationClip> animations = new Dictionary<string, AnimationClip>();
+
+        // Clone the original animations, and store them in a dictionary.
+        foreach (var animation in animatorController.animationClips)
+        {
+            var resultClip = CloneAnimation(spriteSheet, animation, animatorController.name);
+            if (resultClip != null)
+            {
+                animations.Add(resultClip.name, resultClip);
+            }
+        }
+
+        // If the destination folder doesn't exist, we create it.
+        string resultClipsPath =
+            GetAndCreateRelativePath(BaseSpriteSheetsPath, AssetDatabase.GetAssetPath(spriteSheet), animatorName);
+
+        // We are using animation override controllers for the new assets.
+        string destinationPath = $"{resultClipsPath}/{animatorName}.overrideController";
+        CreateAnimationOverrideController(destinationPath, animatorName, animatorController, animations);
+    }
 
     private static void CreateAnimationOverrideController(string destinationPath,
         string animatorName,
@@ -22,8 +46,17 @@ public static class CloneAnimationLogic
         Dictionary<string, AnimationClip> animations)
     {
         // Create a new Override Controller.
-        var destinationOverrideController = new AnimatorOverrideController(originalAnimatorController);
-        AssetDatabase.CreateAsset(destinationOverrideController, destinationPath);
+        AnimatorOverrideController destinationOverrideController =
+            AssetDatabase.LoadAssetAtPath<AnimatorOverrideController>(destinationPath);
+        if (destinationOverrideController == null)
+        {
+            destinationOverrideController = new AnimatorOverrideController(originalAnimatorController);
+            AssetDatabase.CreateAsset(destinationOverrideController, destinationPath);
+        }
+        else
+        {
+            destinationOverrideController.runtimeAnimatorController = originalAnimatorController;
+        }
 
         // Start assigning animations.
         foreach (var animation in originalAnimatorController.animationClips)
@@ -34,6 +67,9 @@ public static class CloneAnimationLogic
                 destinationOverrideController[animation.name] = animationClip;
             }
         }
+
+        // We mark as Dirty
+        EditorUtility.SetDirty(destinationOverrideController);
 
         // Save and refresh the hierarchy
         AssetDatabase.SaveAssets();
@@ -52,17 +88,12 @@ public static class CloneAnimationLogic
         // If the destination folder doesn't exist, we create it.
         // We are creating folders trying to keep the structure we had with the SpriteSheet.
         string animatorName = spriteSheet.name;
-        string relativePath = Path.GetRelativePath(BaseSpriteSheetsPath,
-            Path.GetDirectoryName(AssetDatabase.GetAssetPath(spriteSheet)));
-        string resultClipsPath = ($"{BaseAnimationsPath}{relativePath}/{animatorName}");
-        if (!Directory.Exists(resultClipsPath))
-        {
-            Directory.CreateDirectory(resultClipsPath);
-        }
+        string destinationClipsPath =
+            GetAndCreateRelativePath(BaseSpriteSheetsPath, AssetDatabase.GetAssetPath(spriteSheet), animatorName);
 
         // If the clip doesn't already exist, we create a new one.
         string clipName = originalClip.name.Replace(originalAnimatorName, animatorName);
-        string resultClipPath = $"{resultClipsPath}/{clipName}.anim";
+        string resultClipPath = $"{destinationClipsPath}/{clipName}.anim";
         var resultClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(resultClipPath);
         if (resultClip == null)
         {
@@ -87,24 +118,21 @@ public static class CloneAnimationLogic
             }
 
             bool success = BuildKeyframesForBinding(spriteSheet, binding, originalClip, resultClip);
-            if (success)
+            if (!success)
             {
-                continue;
+                // If we couldn't build the keyframe, we just return null and throw an error. 
+                // (There's probably a nicer way of handling it, but... For now this works)
+                Debug.LogWarning($"We couldn't build the animation for {resultClipPath}");
+                AssetDatabase.DeleteAsset(resultClipPath);
+                return null;
             }
-
-            // If we couldn't build the keyframe, we just return null and throw an error. 
-            // (There's probably a nicer way of handling it, but... For now this works)
-            Debug.LogWarning($"We couldn't build the animation for {resultClipPath}");
-            AssetDatabase.DeleteAsset(resultClipPath);
-            return null;
         }
 
         // Copy the events.
         AnimationUtility.SetAnimationEvents(resultClip, AnimationUtility.GetAnimationEvents(originalClip));
 
-        // Save
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
+        // Save the asset
+        AssetDatabase.SaveAssetIfDirty(resultClip);
 
         // We return the clip
         return resultClip;
@@ -148,46 +176,23 @@ public static class CloneAnimationLogic
         return true;
     }
 
-    public static void BuildAnimator(AnimatorController animatorController, Texture2D spriteSheet)
+    private static string GetAndCreateRelativePath(string basePath, string assetPath, string assetName)
     {
-        string animatorName = spriteSheet.name;
-        Dictionary<string, AnimationClip> animations = new Dictionary<string, AnimationClip>();
-
-        // Clone the original animations, and store them in a dictionary.
-        foreach (var animation in animatorController.animationClips)
-        {
-            var resultClip = CloneAnimation(spriteSheet, animation, animatorController.name);
-            if (resultClip != null)
-            {
-                animations.Add(resultClip.name, resultClip);
-            }
-        }
-
-        // If the destination folder doesn't exist, we create it.
-        string relativePath = Path.GetRelativePath(BaseSpriteSheetsPath,
-            Path.GetDirectoryName(AssetDatabase.GetAssetPath(spriteSheet)));
-        string resultClipsPath = ($"{BaseAnimationsPath}{relativePath}/{animatorName}");
+        string relativePath = Path.GetRelativePath(basePath, Path.GetDirectoryName(assetPath));
+        // We don't want '.' as a path.
+        string resultClipsPath = relativePath == "." ? Path.Join(BaseAnimationsPath, assetName): Path.Join(BaseAnimationsPath, relativePath, assetName);
         if (!Directory.Exists(resultClipsPath))
         {
             Directory.CreateDirectory(resultClipsPath);
         }
 
-        // We are using animation override controllers for the new assets.
-        // If it exists, we just delete it before rebuilding it.
-        var destinationPath = $"{resultClipsPath}/{animatorName}.overrideController";
-        var assetGuid = AssetDatabase.AssetPathToGUID(destinationPath);
-        if (!string.IsNullOrEmpty(assetGuid))
-        {
-            AssetDatabase.DeleteAsset(destinationPath);
-        }
-
-        CreateAnimationOverrideController(destinationPath, animatorName, animatorController, animations);
+        return resultClipsPath;
     }
 
     private static Dictionary<string, Sprite> LoadSpriteByName(Texture2D texture)
     {
         string assetPath = AssetDatabase.GetAssetPath(texture);
-        Object[] sprites = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+        var sprites = AssetDatabase.LoadAllAssetsAtPath(assetPath);
         if (sprites == null)
         {
             return null;
@@ -201,6 +206,6 @@ public static class CloneAnimationLogic
 
         return spriteDictionary;
     }
-    
+
     #endregion
 }
