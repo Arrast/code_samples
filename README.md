@@ -13,11 +13,12 @@ Each directory in this repository represents a standalone code sample or small t
 | Project                  | Tech Stack                | Description                                                     | Year   |
 | ------------------------ | ------------------------- | --------------------------------------------------------------- | ------ |
 | `/clone_animation_tool/` | Unity, C#                 | A small tool I build to clone 2D sprite-swap animations         | 2025   |
+| `/cooking_api/`          | ASP.NET, C#               | A small API project with basic CRUD functionality               | 2025   |
 > 🔍 See each folder’s README for detailed explanation, setup, and features.
 
 ## 🛠️ Technologies & Tools
 * Languages: `C#`
-* Frameworks/Tools: `Unity`
+* Frameworks/Tools: `Unity`,`ASP.NET`
 
 ## 📬 Contact Information
 * Email: [vmanuel.egea@gmail.com](mailto:vmanuel.egea@gmail.com)
